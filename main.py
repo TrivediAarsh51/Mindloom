@@ -3,12 +3,16 @@ import asyncio
 from autogen_agentchat.agents import AssistantAgent
 from autogen_ext.models.openai import OpenAIChatCompletionClient
 
-# Connect Ollama
+from core.tool_router import execute_tool_command
+
+
+# =========================
+# MODEL (OLLAMA)
+# =========================
 model_client = OpenAIChatCompletionClient(
     model="qwen2.5-coder:14b",
     base_url="http://localhost:11434/v1",
     api_key="ollama",
-
     model_info={
         "vision": False,
         "function_calling": False,
@@ -18,78 +22,134 @@ model_client = OpenAIChatCompletionClient(
     }
 )
 
-# Planner Agent
+
+# =========================
+# AGENTS
+# =========================
 planner = AssistantAgent(
     name="Planner",
     model_client=model_client,
     system_message="""
-    You are a senior software architect.
-    Create structured implementation plans.
-    """
+You are a senior software architect.
+Create structured step-by-step implementation plans.
+"""
 )
 
-# Coder Agent
 coder = AssistantAgent(
     name="Coder",
     model_client=model_client,
     system_message="""
-    You are an expert Python programmer.
-    Write clean and efficient code.
-    """
+You are a coding agent.
+
+You MUST output ONLY TOOL commands.
+
+STRICT FORMAT:
+
+TOOL: write_file("filepath", "content")
+TOOL: run_python("filepath")
+TOOL: run_shell("command")
+
+Examples:
+
+TOOL: write_file("workspace/hello.py", "print('Hello World')")
+TOOL: run_python("workspace/hello.py")
+
+Rules:
+- Use double quotes around ALL arguments
+- No markdown
+- No explanations
+- No extra text
+- Output ONLY TOOL commands
+"""
 )
 
-# Critic Agent
 critic = AssistantAgent(
     name="Critic",
     model_client=model_client,
     system_message="""
-    You review software and identify bugs,
-    optimizations, and improvements.
-    """
+You are a strict code reviewer.
+Find bugs, mistakes, and improvements.
+"""
 )
 
+
+# =========================
+# TOOL EXECUTION
+# =========================
+def run_tool_execution(agent_output: str):
+    lines = agent_output.split("\n")
+    results = []
+
+    for line in lines:
+        line = line.strip()
+
+        if line.startswith("TOOL:"):
+            command = line.replace("TOOL:", "").strip()
+
+            print(f"\n⚙️ Executing: {command}")
+
+            result = execute_tool_command(command)
+
+            print("Result:", result)
+
+            results.append(result)
+
+    return results
+
+
+# =========================
+# MAIN AUTONOMOUS LOOP
+# =========================
 async def main():
 
-    task = """
-    Build a simple Python calculator app
-    supporting:
-    - addition
-    - subtraction
-    - multiplication
-    - division
-    """
+    max_iterations = 3
+    task = "Create a Python file that prints Hello World"
 
-    # STEP 1 — Planning
-    print("\n===== PLANNER =====\n")
+    for i in range(max_iterations):
 
-    plan = await planner.run(task=task)
+        print(f"\n🚀 ITERATION {i+1}")
 
-    planner_output = plan.messages[-1].content
+        # 1. PLANNER
+        plan = await planner.run(task=task)
+        plan_output = plan.messages[-1].content
 
-    print(planner_output)
+        print("\n📌 PLAN:\n", plan_output)
 
-    # STEP 2 — Coding
-    print("\n===== CODER =====\n")
+        # 2. CODER
+        code = await coder.run(task=plan_output)
+        coder_output = code.messages[-1].content
 
-    code = await coder.run(task=planner_output)
+        print("\n🤖 CODER OUTPUT:\n", coder_output)
 
-    coder_output = code.messages[-1].content
+        # 3. EXECUTE TOOLS
+        tool_results = run_tool_execution(coder_output)
 
-    print(coder_output)
+        print("\n⚙️ TOOL RESULTS:\n", tool_results)
 
-    # STEP 3 — Review
-    print("\n===== CRITIC =====\n")
+        # 4. CRITIC REVIEW
+        review = await critic.run(task=coder_output)
+        critic_output = review.messages[-1].content
 
-    review = await critic.run(task=coder_output)
+        print("\n🧠 CRITIC:\n", critic_output)
 
-    critic_output = review.messages[-1].content
+        # 5. FAILURE CHECK
+        if any("error" in str(r).lower() for r in tool_results):
+            task = f"""
+Fix these issues and regenerate correct code:
 
-    print(critic_output)
+Tool errors:
+{tool_results}
 
-    # STEP 4 — Save generated code
-    with open("calculator.py", "w", encoding="utf-8") as f:
-        f.write(coder_output)
+Critic feedback:
+{critic_output}
+"""
+        else:
+            print("\n✅ SUCCESS - TASK COMPLETED")
+            break
 
-    print("\n✅ calculator.py saved successfully")
 
-asyncio.run(main())
+# =========================
+# ENTRY POINT
+# =========================
+if __name__ == "__main__":
+    asyncio.run(main())
