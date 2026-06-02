@@ -1,0 +1,85 @@
+[
+    {
+        "task": "Planning",
+        "depends_on": [],
+        "status": "done"
+    },
+    {
+        "task": "Code Generation",
+        "depends_on": [
+            "Planning"
+        ],
+        "status": "done"
+    },
+    {
+        "task": "Review",
+        "depends_on": [
+            "Code Generation"
+        ],
+        "status": "done"
+    },
+    {
+        "task": "Planning",
+        "depends_on": [],
+        "status": "done"
+    },
+    {
+        "task": "Code Generation",
+        "depends_on": [
+            "Planning"
+        ],
+        "status": "done"
+    },
+    {
+        "task": "Review",
+        "depends_on": [
+            "Code Generation"
+        ],
+        "status": "done"
+    },
+    {
+        "task": "Planning",
+        "depends_on": [],
+        "status": "done"
+    },
+    {
+        "task": "Code Generation",
+        "depends_on": [
+            "Planning"
+        ],
+        "status": "done"
+    },
+    {
+        "task": "Review",
+        "depends_on": [
+            "Code Generation"
+        ],
+        "status": "done"
+    },
+    {
+        "task": "Planning",
+        "depends_on": [],
+        "status": "done"
+    },
+    {
+        "task": "Code Generation",
+        "depends_on": [
+            "Planning"
+        ],
+        "status": "done"
+    },
+    {
+        "task": "Testing",
+        "depends_on": [
+            "Code Generation"
+        ],
+        "status": "done"
+    },
+    {
+        "task": "Review",
+        "depends_on": [
+            "Testing"
+        ],
+        "status": "done"
+    }
+]

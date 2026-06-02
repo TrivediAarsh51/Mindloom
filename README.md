@@ -1,127 +1,194 @@
-# Mindloom
+# 🧠 Mindloom
 
-Mindloom is a local first autonomous AI agent framework designed to plan tasks, generate code, execute actions, review results, and iteratively improve solutions.
+Mindloom is a local-first autonomous AI multi-agent framework designed to plan, design, generate, execute, test, and iteratively improve software projects using open-source LLMs.
 
-The project runs entirely on local hardware using Ollama and open source language models.
+It runs fully locally using Ollama and supports a multi-agent engineering workflow that simulates a real software development team.
 
-## Current Features
+---
 
-Local LLM execution through Ollama
+## 🚀 Current Version: v0.7
 
-Multi agent architecture
+Mindloom v0.7 introduces:
 
-Planner agent for task decomposition
+- 🧠 **Multi-agent AI system** (Planner, Coder, Critic, Fixer, Test Runner)  
+- 🔁 **Self-healing code loop** (auto-fix broken code)  
+- 🧪 **Automated test execution system**  
+- 📁 **Multi-file project generation**  
+- ⚙️ **Tool-based execution system** (write/run files, shell commands)  
+- 🏗 **Architecture-driven development flow**  
+- 💾 **Persistent memory + task graph execution**  
 
-Coder agent for code generation
+---
 
-Critic agent for review and feedback
-
-Tool execution system
-
-File creation and modification
-
-Python code execution
-
-Shell command execution
-
-Autonomous task loop
-
-Local operation without cloud APIs
-
-## Architecture
+## 🧩 Architecture
 
 User Request
+↓
+Architect Agent
+↓
+Planner Agent
+↓
+Parallel Coder Agents (v0.8+ expansion ready)
+↓
+Tool Execution Layer
+↓
+Test Runner
+↓
+Critic Agent
+↓
+Fixer Agent (self-healing loop)
+↓
+Final Output
 
-Planner
 
-Coder
+---
 
-Tool Router
+## 🧠 Agents
 
-Execution Layer
+### 🏗 Architect Agent
+- Generates system architecture  
+- Defines project structure  
 
-Critic
+### 📋 Planner Agent
+- Breaks user request into structured tasks  
 
-Retry Loop
+### 💻 Coder Agent(s)
+- Generates code using TOOL commands only  
+- Can create and modify multiple files  
 
-## Project Structure
+### 🧪 Test Runner
+- Executes test files inside workspace  
+- Validates generated code  
 
-ai-swarm
+### 🧠 Critic Agent
+- Reviews code quality, structure, and logic  
 
-main.py
+### 🔧 Fixer Agent
+- Fixes broken code based on:  
+  - Tool errors  
+  - Test failures  
+  - Critic feedback  
 
-core
+---
 
-tool_router.py
+## ⚙️ Features
 
-tools
+- ✔ **Autonomous Code Generation**  
+  Mindloom can generate full projects from a single prompt.  
 
-executor.py
+- ✔ **Tool-Based Execution**  
+  Supports:
+  - File creation  
+  - Code execution  
+  - Shell commands  
 
-workspace
+- ✔ **Self-Healing Loop**  
+  Automatically retries and fixes broken code until success.  
 
-generated files
+- ✔ **Multi-File Projects**  
+  Supports structured project generation instead of single scripts.  
 
-## Requirements
+- ✔ **Persistent Memory**  
+  Stores:
+  - Architecture  
+  - Plans  
+  - Generated code  
+  - Test results  
+  - Reviews  
 
-Windows 11
+---
 
-Python 3.11 or newer
+## 📁 Project Structure
 
-Ollama
+ai-swarm/
+│
+├── main.py
+├── README.md
+│
+├── core/
+│ ├── architect.py
+│ ├── memory.py
+│ ├── task_graph.py
+│ ├── tool_router.py
+│ ├── fixer.py
+│ └── test_runner.py
+│
+├── tools/
+│ ├── executor.py
+│ └── test.py
+│
+├── workspace/
+│ ├── project_state/
+│ │ ├── memory.json
+│ │ ├── tasks.json
+│ │ ├── architecture.md
+│ │ └── logs.json
+│ └── generated projects/
 
-Qwen2.5 Coder 14B
+## 🧪 Requirements
 
-AutoGen
+- Python 3.11+
+- Windows 10/11 (or Linux)
+- Ollama installed
+- Model: qwen2.5-coder:32b (or similar)
+- 16GB+ RAM recommended (32GB preferred)
 
-32 GB RAM recommended
+## 📦 Install Dependencies
 
-NVMe SSD recommended
+```bash
+pip install -r requirements.txt
+```
 
-## Current Status
+## 🚀 Run Locally
 
-Version 0.3
+#### Start Ollama:
 
-Implemented
+```bash
+ollama run qwen2.5-coder:32b
+```
 
-Agent orchestration
+#### Run Mindloom:
 
-Tool execution layer
+```bash
+python main.py
+```
 
-Local model integration
+---
 
-Basic autonomous workflow
+## 🧪 Example Usage
 
-Planned
+Run Mindloom:
 
-Memory system
+```bash
+python main.py
+```
 
-Project workspace management
+> [!Example Prompt:]
+>
+> Create a Python calculator project with:
+> - add, subtract, multiply, divide
+> - separate modules
+> - unit tests
 
-Multi file project generation
 
-Long running autonomous tasks
+## 🔁 Execution Flow
 
-Multi agent collaboration
+- Architecture is generated
+- Plan is created
+- Code is generated (possibly multi-file)
+- TOOL commands are executed
+- Tests are run automatically
+- Critic reviews output
+- Fixer resolves issues (loop until success)
 
-Browser automation
+## 🧠 Vision
 
-## Installation
+Mindloom aims to become a fully autonomous local AI software engineering system, capable of:
 
-Clone repository
+- Designing software systems
+- Writing production-ready code
+- Testing and debugging automatically
+- Improving itself over time
+- Running completely offline
 
-Create virtual environment
 
-Install dependencies
-
-Install Ollama
-
-Download Qwen2.5 Coder
-
-Start Ollama
-
-Run main.py
-
-## Vision
-
-Mindloom aims to become a fully autonomous local AI operating system capable of planning, coding, executing, reviewing, and improving software projects independently while remaining fully open source and self hosted.
