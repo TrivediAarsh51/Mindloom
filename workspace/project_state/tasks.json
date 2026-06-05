@@ -1,85 +1,17 @@
 [
     {
-        "task": "Planning",
+        "task": "backend:api.py",
         "depends_on": [],
-        "status": "done"
+        "status": "pending"
     },
     {
-        "task": "Code Generation",
-        "depends_on": [
-            "Planning"
-        ],
-        "status": "done"
-    },
-    {
-        "task": "Review",
-        "depends_on": [
-            "Code Generation"
-        ],
-        "status": "done"
-    },
-    {
-        "task": "Planning",
+        "task": "core:logic.py",
         "depends_on": [],
-        "status": "done"
+        "status": "pending"
     },
     {
-        "task": "Code Generation",
-        "depends_on": [
-            "Planning"
-        ],
-        "status": "done"
-    },
-    {
-        "task": "Review",
-        "depends_on": [
-            "Code Generation"
-        ],
-        "status": "done"
-    },
-    {
-        "task": "Planning",
+        "task": "tests:test_logic.py",
         "depends_on": [],
-        "status": "done"
-    },
-    {
-        "task": "Code Generation",
-        "depends_on": [
-            "Planning"
-        ],
-        "status": "done"
-    },
-    {
-        "task": "Review",
-        "depends_on": [
-            "Code Generation"
-        ],
-        "status": "done"
-    },
-    {
-        "task": "Planning",
-        "depends_on": [],
-        "status": "done"
-    },
-    {
-        "task": "Code Generation",
-        "depends_on": [
-            "Planning"
-        ],
-        "status": "done"
-    },
-    {
-        "task": "Testing",
-        "depends_on": [
-            "Code Generation"
-        ],
-        "status": "done"
-    },
-    {
-        "task": "Review",
-        "depends_on": [
-            "Testing"
-        ],
-        "status": "done"
+        "status": "pending"
     }
 ]

@@ -1,28 +1,37 @@
 import os
 import subprocess
+from threading import Lock
+
+file_lock = Lock()
 
 
 def write_file(path: str, content: str):
-    """
-    Write content to a file.
-    Creates directories automatically if needed.
-    """
 
     try:
+
         directory = os.path.dirname(path)
 
         if directory:
             os.makedirs(directory, exist_ok=True)
 
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(content)
+        with file_lock:
+
+            with open(
+                path,
+                "w",
+                encoding="utf-8"
+            ) as f:
+
+                f.write(content)
 
         return {
             "success": True,
-            "message": f"File written: {path}"
+            "message": f"File written: {path}",
+            "path": path
         }
 
     except Exception as e:
+
         return {
             "success": False,
             "error": str(e)
@@ -30,11 +39,9 @@ def write_file(path: str, content: str):
 
 
 def run_python(path: str):
-    """
-    Execute a Python file and capture output.
-    """
 
     try:
+
         result = subprocess.run(
             ["python", path],
             capture_output=True,
@@ -50,6 +57,7 @@ def run_python(path: str):
         }
 
     except Exception as e:
+
         return {
             "success": False,
             "error": str(e)
@@ -57,11 +65,9 @@ def run_python(path: str):
 
 
 def run_shell(command: str):
-    """
-    Execute a shell command.
-    """
 
     try:
+
         result = subprocess.run(
             command,
             shell=True,
@@ -78,6 +84,7 @@ def run_shell(command: str):
         }
 
     except Exception as e:
+
         return {
             "success": False,
             "error": str(e)

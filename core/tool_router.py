@@ -1,32 +1,68 @@
 import ast
+import traceback
 
-from tools.executor import write_file, run_python, run_shell
+from tools.executor import (
+    write_file,
+    run_python,
+    run_shell
+)
+
+ALLOWED_TOOLS = {
+    "write_file": write_file,
+    "run_python": run_python,
+    "run_shell": run_shell
+}
 
 
 def execute_tool_command(command: str):
 
     try:
-        tree = ast.parse(command, mode="eval")
+
+        tree = ast.parse(
+            command,
+            mode="eval"
+        )
+
+        if not isinstance(
+            tree.body,
+            ast.Call
+        ):
+            return {
+                "success": False,
+                "error": "Not a function call"
+            }
 
         call = tree.body
 
         func_name = call.func.id
 
-        args = []
+        if func_name not in ALLOWED_TOOLS:
 
-        for arg in call.args:
-            args.append(ast.literal_eval(arg))
+            return {
+                "success": False,
+                "error": f"Unknown tool: {func_name}"
+            }
 
-        if func_name == "write_file":
-            return write_file(args[0], args[1])
+        args = [
+            ast.literal_eval(arg)
+            for arg in call.args
+        ]
 
-        elif func_name == "run_python":
-            return run_python(args[0])
+        result = ALLOWED_TOOLS[
+            func_name
+        ](*args)
 
-        elif func_name == "run_shell":
-            return run_shell(args[0])
-
-        return f"Unknown tool: {func_name}"
+        return {
+            "success": True,
+            "tool": func_name,
+            "args": args,
+            "result": result
+        }
 
     except Exception as e:
-        return f"ERROR: {str(e)}"
+
+        return {
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }

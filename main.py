@@ -1,4 +1,7 @@
 import asyncio
+import json
+import re
+from pathlib import Path
 
 from autogen_agentchat.agents import AssistantAgent
 from autogen_ext.models.openai import OpenAIChatCompletionClient
@@ -12,20 +15,19 @@ from core.test_runner import TestRunner
 
 
 # =========================
-# SYSTEM INIT
+# INIT
 # =========================
+
+workspace_dir = Path("workspace")
+workspace_dir.mkdir(exist_ok=True)
+
 memory = Memory()
 task_graph = TaskGraph()
 architect = ArchitectAgent()
+test_runner = TestRunner(workspace=str(workspace_dir))
 
-test_runner = TestRunner(workspace="workspace")
-
-
-# =========================
-# MODEL CLIENT
-# =========================
 model_client = OpenAIChatCompletionClient(
-    model="qwen2.5-coder:32b",
+    model="qwen2.5-coder:7b",
     base_url="http://localhost:11434/v1",
     api_key="ollama",
     model_info={
@@ -37,230 +39,245 @@ model_client = OpenAIChatCompletionClient(
     }
 )
 
-
-# =========================
-# AGENTS
-# =========================
-planner = AssistantAgent(
-    name="Planner",
-    model_client=model_client,
-    system_message="You break problems into structured step-by-step plans."
-)
-
-coder = AssistantAgent(
-    name="Coder",
-    model_client=model_client,
-    system_message="""
-You are a senior software engineer.
-
-You ONLY output TOOL commands.
-
-Allowed tools:
-TOOL: write_file("path", "content")
-TOOL: run_python("file")
-TOOL: run_shell("cmd")
-
-Rules:
-- You can create MULTIPLE files
-- Always use correct file paths
-- No explanations
-- No markdown
-"""
-)
-
-critic = AssistantAgent(
-    name="Critic",
-    model_client=model_client,
-    system_message="You review code quality, bugs, structure, and improvements."
-)
-
 fixer = FixerAgent(model_client)
 
 
 # =========================
-# TOOL EXECUTION
+# AGENTS
 # =========================
-def run_tool_execution(output: str):
+
+planner = AssistantAgent(
+    name="Planner",
+    model_client=model_client,
+
+    system_message="""
+    You are a strict JSON generator.
+
+    OUTPUT ONLY VALID JSON.
+
+    NO TEXT BEFORE OR AFTER.
+
+    NO LABELS LIKE "Planning", "Code Generation".
+
+    FORMAT ONLY:
+
+    {
+    "backend": ["file.py"],
+    "core": ["file.py"],
+    "tests": ["file.py"]
+    }
+    """
+)
+
+coders = {
+    "backend": AssistantAgent(
+        name="Coder_backend",
+        model_client=model_client,
+        system_message="Only output TOOL commands."
+    ),
+    "core": AssistantAgent(
+        name="Coder_core",
+        model_client=model_client,
+        system_message="Only output TOOL commands."
+    ),
+    "tests": AssistantAgent(
+        name="Coder_tests",
+        model_client=model_client,
+        system_message="Only output TOOL commands."
+    )
+}
+
+critic = AssistantAgent(
+    name="Critic",
+    model_client=model_client,
+    system_message="Review code and return issues clearly."
+)
+
+
+# =========================
+# SAFE HELPERS
+# =========================
+
+def extract_json(text: str):
+    """Extract first JSON block safely"""
+    match = re.search(r"\{.*\}", text, re.DOTALL)
+    if not match:
+        return None
+    try:
+        return json.loads(match.group())
+    except:
+        return None
+
+
+def normalize_task(task_str: str):
+    """ONLY accept module:file.py format"""
+    if not isinstance(task_str, str):
+        return None
+
+    if ":" not in task_str:
+        return None
+
+    parts = task_str.split(":")
+
+    if len(parts) != 2:
+        return None
+
+    module, file_name = parts
+
+    if not file_name.endswith(".py"):
+        return None
+
+    return module, file_name
+
+
+def run_tool_execution(agent_output: str):
     results = []
 
-    for line in output.split("\n"):
+    for line in agent_output.split("\n"):
         line = line.strip()
 
         if line.startswith("TOOL:"):
-            command = line.replace("TOOL:", "").strip()
-
-            print(f"\n⚙️ EXECUTING: {command}")
-
-            result = execute_tool_command(command)
-
-            print("RESULT:", result)
-
+            cmd = line.replace("TOOL:", "").strip()
+            result = execute_tool_command(cmd)
             results.append(result)
 
     return results
 
 
 # =========================
-# MAIN v0.7 LOOP
+# TASK EXECUTION
 # =========================
-async def main():
 
-    user_request = """
-Build a simple calculator project.
+async def run_task(module, file_name):
 
-Requirements:
-- add, subtract, multiply, divide
-- clean Python structure
-- separate functions
-- include test file
-"""
+    coder = coders.get(module)
 
-    print("\n🏗 Generating Architecture...")
-    architecture = architect.generate_architecture(user_request)
-    memory.add("architecture", architecture)
-    print(architecture)
+    if not coder:
+        print(f"⚠️ No coder for {module}")
+        return
 
-    # =========================
-    # TASK GRAPH (v0.7)
-    # =========================
-    task_graph.add_task("Planning")
-    task_graph.add_task("Code Generation", ["Planning"])
-    task_graph.add_task("Testing", ["Code Generation"])
-    task_graph.add_task("Review", ["Testing"])
+    code = None
+    tool_results = None
 
-    max_attempts = 5
+    for attempt in range(5):
 
-    while True:
+        if code is None:
+            resp = await coder.run(task=f"Generate code for {file_name}")
+            code = resp.messages[-1].content
+        else:
+            code = await fixer.fix(
+                code=code,
+                errors=str(tool_results),
+                review=str(memory.get("review", "")),
+                test_results=str(test_runner.run_tests())
+            )
 
-        task = task_graph.next_task()
+        tool_results = run_tool_execution(code)
 
-        if not task:
+        test_results = test_runner.run_tests()
+
+        if all(r["success"] for r in test_results):
             break
 
-        print(f"\n📌 TASK: {task['task']}")
+    review = await critic.run(
+        task=f"Review {file_name}\n\n{code}"
+    )
 
-        # =========================
-        # PLANNING
-        # =========================
-        if task["task"] == "Planning":
-
-            plan = await planner.run(
-                task=f"""
-User Request:
-{user_request}
-
-Architecture:
-{architecture}
-"""
-            )
-
-            plan_output = plan.messages[-1].content
-            memory.add("plan", plan_output)
-
-            print("\n📌 PLAN:\n", plan_output)
+    memory.add(f"{module}:{file_name}", review.messages[-1].content)
 
 
-        # =========================
-        # CODE GENERATION + SELF FIX LOOP
-        # =========================
-        elif task["task"] == "Code Generation":
+# =========================
+# MAIN
+# =========================
 
-            attempt = 0
-            success = False
-            code = None
-            tool_results = None
+async def main():
 
-            while not success and attempt < max_attempts:
+    task_graph.save([])
 
-                attempt += 1
-                print(f"\n🔁 ATTEMPT {attempt}")
+    user_request = "Create a Python project with backend, core logic, and tests."
 
-                # FIRST GENERATION
-                if code is None:
+    architecture = architect.generate_architecture(user_request)
+    memory.add("architecture", architecture)
 
-                    result = await coder.run(
-                        task=f"""
-Architecture:
-{architecture}
+    plan_resp = await planner.run(task=user_request)
 
-Plan:
-{memory.get('plan')}
-"""
-                    )
+    plan_output = plan_resp.messages[-1].content
 
-                    code = result.messages[-1].content
+    match = re.search(r"\{.*\}", plan_output, re.DOTALL)
 
-                # FIX LOOP
-                else:
+    if not match:
+        print("❌ Planner failed: no JSON found")
+        print(plan_output)
+        exit()
 
-                    test_results = test_runner.run_tests()
+    try:
+        module_plan = json.loads(match.group())
+    except:
+        print("❌ Planner returned invalid JSON")
+        print(plan_output)
+        exit()
 
-                    code = await fixer.fix(
-                        code=code,
-                        errors=str(tool_results),
-                        review=str(memory.get("review", "")),
-                        test_results=str(test_results)
-                    )
+    # =========================
+    # TASK CREATION (STRICT)
+    # =========================
 
-                memory.add("generated_code", code)
-                print("\n💻 CODE:\n", code)
+    for module, files in module_plan.items():
 
-                # EXECUTE TOOLS
-                tool_results = run_tool_execution(code)
-                memory.add("tool_results", str(tool_results))
+        if not isinstance(files, list):
+            continue
 
-                # RUN TESTS
-                test_results = test_runner.run_tests()
+        for file in files:
 
-                print("\n🧪 TEST RESULTS:")
-                for t in test_results:
-                    print(t)
+            # MUST be string
+            if not isinstance(file, str):
+                continue
 
-                # SUCCESS CHECK
-                if all(t["success"] for t in test_results) and not any(
-                    "error" in str(x).lower() for x in tool_results
-                ):
-                    success = True
-                    print("\n✅ CODE SUCCESSFUL")
-                else:
-                    print("\n⚠️ FAIL → FIXING...")
+            # MUST be python file
+            if not file.endswith(".py"):
+                continue
 
-        # =========================
-        # TEST + REVIEW
-        # =========================
-        elif task["task"] == "Testing":
+            task = f"{module}:{file}"
 
-            test_results = test_runner.run_tests()
-            memory.add("test_results", str(test_results))
+            # FINAL VALIDATION (critical)
+            if len(task.split(":")) != 2:
+                continue
 
-            print("\n🧪 FINAL TEST RESULTS:")
-            for t in test_results:
-                print(t)
+        task_graph.add_task(task)
 
-        elif task["task"] == "Review":
+        print(f"✅ Valid task added: {task}")
 
-            review = await critic.run(
-                task=f"""
-Code:
-{memory.get('generated_code')}
+    # =========================
+    # LOAD TASKS
+    # =========================
 
-Test Results:
-{memory.get('test_results')}
+    ready_tasks = [
+        t for t in task_graph.load()
+        if t["status"] == "pending"
+    ]
 
-Tool Results:
-{memory.get('tool_results')}
-"""
-            )
+    tasks = []
 
-            review_output = review.messages[-1].content
-            memory.add("review", review_output)
+    for task in ready_tasks:
 
-            print("\n🧠 REVIEW:\n", review_output)
+        normalized = normalize_task(task["task"])
 
-        task_graph.complete(task["task"])
+        if not normalized:
+            print(f"⚠️ Skipping corrupt task: {task['task']}")
+            continue
 
-    print("\n🚀 Mindloom v0.7 COMPLETED SUCCESSFULLY")
+        module, file_name = normalized
 
+        tasks.append(run_task(module, file_name))
+
+
+    await asyncio.gather(*tasks)
+
+    print("\n✅ Mindloom v0.8 STABLE EXECUTION COMPLETE")
+
+
+# =========================
+# ENTRY
+# =========================
 
 if __name__ == "__main__":
     asyncio.run(main())
